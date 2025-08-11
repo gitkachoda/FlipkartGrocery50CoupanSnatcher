@@ -32,7 +32,7 @@ def generate_random_code():
     return BASE_COUPON + ''.join(random.choices(string.ascii_uppercase + string.digits, k=13))
 
 def try_coupon(coupon_code):
-    url = "https://1.rome.api.flipkart.com/api/1/action/view"
+    url = "https://2.rome.api.flipkart.com/api/1/action/view"
     headers = {
         "content-type": "application/json",
         "cookie": COOKIES,
@@ -60,6 +60,7 @@ def try_coupon(coupon_code):
         with open(LOG_FILE, "a", encoding="utf-8") as f:
             f.write(log_entry + "\n")
 
+        # Only send message when max redemption limit is reached
         if "You have reached maximum redemption limit" in error_message:
             telegram_text = (
                 f"🟩 <b>Coupon Tried:</b> {coupon_code}\n"
@@ -77,7 +78,9 @@ def coupon_worker():
     while RUNNING:
         code = generate_random_code()
         try_coupon(code)
-        # time.sleep(random.randint(1, 3))  # optional delay
+        delay = random.randint(1,3)
+        print(f"Waiting {delay} seconds...")
+        time.sleep(delay)
 
 @app.route("/")
 def home():
@@ -95,14 +98,11 @@ def get_logs():
 def status():
     return jsonify({"running": RUNNING})
 
-# Start worker thread at import time (works for both local and Gunicorn/Render)
-def start_worker():
+if __name__ == "__main__":
+    # Send startup message once when server starts
     send_telegram_message("✅ <b>Coupon Bot Started</b>\nServer is now running and trying coupons...")
+
+    # Background thread for coupon worker
     t = threading.Thread(target=coupon_worker, daemon=True)
     t.start()
-
-start_worker()  # runs immediately when app starts
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=5000)
