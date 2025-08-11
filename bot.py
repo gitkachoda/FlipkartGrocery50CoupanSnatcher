@@ -15,16 +15,13 @@ CHAT_ID = os.getenv("CHAT_ID")
 BASE_COUPON = os.getenv("BASE_COUPON")
 COOKIES = os.getenv("FLIPKART_COOKIES")
 
-LOG_FILE = "coupon_log.txt"
 RUNNING = True
 
 app = Flask(__name__)
 
-def log_to_file(msg):
-    """Append log to file and print to console"""
+def log_to_console(msg):
+    """Instant print with timestamp"""
     timestamped = f"[{datetime.now()}] {msg}"
-    with open(LOG_FILE, "a", encoding="utf-8") as f:
-        f.write(timestamped + "\n")
     print(timestamped)
 
 def send_telegram_message(text):
@@ -33,7 +30,7 @@ def send_telegram_message(text):
     try:
         requests.post(url, json=payload, timeout=10)
     except Exception as e:
-        log_to_file(f"Telegram Error: {e}")
+        log_to_console(f"Telegram Error: {e}")
 
 def generate_random_code():
     return BASE_COUPON + ''.join(random.choices(string.ascii_uppercase + string.digits, k=13))
@@ -63,11 +60,9 @@ def try_coupon(coupon_code):
         action_success = data.get("RESPONSE", {}).get("actionSuccess", None)
         error_message = data.get("RESPONSE", {}).get("errorMessage", "")
 
-        # Only log essential details
         log_entry = f"CODE: {coupon_code} | SUCCESS: {action_success} | ERROR: {error_message}"
-        log_to_file(log_entry)
+        log_to_console(log_entry)
 
-        # Send Telegram if specific condition met
         if "You have reached maximum redemption limit" in (error_message or ""):
             telegram_text = (
                 f"🟩 <b>Coupon Tried:</b> {coupon_code}\n"
@@ -77,7 +72,7 @@ def try_coupon(coupon_code):
             send_telegram_message(telegram_text)
 
     except Exception as e:
-        log_to_file(f"Request Error: {e}")
+        log_to_console(f"Request Error: {e}")
 
 def coupon_worker():
     while RUNNING:
@@ -89,14 +84,6 @@ def coupon_worker():
 @app.route("/")
 def home():
     return jsonify({"status": "running", "message": "Coupon bot active"})
-
-@app.route("/logs")
-def get_logs():
-    if not os.path.exists(LOG_FILE):
-        return jsonify({"logs": []})
-    with open(LOG_FILE, "r", encoding="utf-8") as f:
-        logs = f.readlines()
-    return jsonify({"logs": logs[-50:]})
 
 @app.route("/status")
 def status():
