@@ -63,16 +63,19 @@ def try_coupon(coupon_code):
         log_entry = f"CODE: {coupon_code} | SUCCESS: {action_success} | ERROR: {error_message}"
         log_to_console(log_entry)
 
-        if "You have reached maximum redemption limit" in (error_message or ""):
-            telegram_text = (
-                f"🟩 <b>Coupon Tried:</b> {coupon_code}\n"
-                f"✅ <b>Success:</b> {action_success}\n"
-                f"<b>Message:</b> {error_message}"
-            )
-            send_telegram_message(telegram_text)
+        telegram_text = (
+            f"💥 <b>Coupon Tried:</b> {coupon_code}\n"
+            f"🔗 <b>Request URL:</b> {url}\n"
+            f"📨 <b>Request Payload:</b> {payload}\n"
+            f"📥 <b>Response:</b> {data}\n"
+            f"✅ <b>Success:</b> {action_success}\n"
+            f"❗ <b>Error Message:</b> {error_message}"
+        )
+        send_telegram_message(telegram_text)
 
     except Exception as e:
         log_to_console(f"Request Error: {e}")
+        send_telegram_message(f"⚠️ <b>Request Error:</b> {e}")
 
 def coupon_worker():
     while RUNNING:
