@@ -4,32 +4,44 @@ import random
 import string
 import threading
 import requests
-from dotenv import load_dotenv
 from datetime import datetime
 from flask import Flask, jsonify
 
-load_dotenv()
-
+# Environment variables (Render Dashboard → Environment)
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 BASE_COUPON = os.getenv("BASE_COUPON")
 COOKIES = os.getenv("FLIPKART_COOKIES")
 
-LOG_FILE = "coupon_log.txt"
+# In-memory log buffer
+LOGS = []
+MAX_LOGS = 200
 RUNNING = True
 
 app = Flask(__name__)
 
 def send_telegram_message(text):
+    if not BOT_TOKEN or not CHAT_ID:
+        print("⚠️ Telegram config missing, skipping send.")
+        return
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     payload = {"chat_id": CHAT_ID, "text": text, "parse_mode": "HTML"}
     try:
-        requests.post(url, json=payload, timeout=10)
+        r = requests.post(url, json=payload, timeout=10)
+        print(f"📩 Telegram sent: {r.status_code}")
     except Exception as e:
-        print("Telegram Error:", e)
+        print("❌ Telegram Error:", e)
 
 def generate_random_code():
     return BASE_COUPON + ''.join(random.choices(string.ascii_uppercase + string.digits, k=13))
+
+def log_message(msg):
+    """Store in memory and print to console."""
+    timestamped = f"[{datetime.now()}] {msg}"
+    LOGS.append(timestamped)
+    if len(LOGS) > MAX_LOGS:
+        LOGS.pop(0)
+    print(timestamped)
 
 def try_coupon(coupon_code):
     url = "https://2.rome.api.flipkart.com/api/1/action/view"
@@ -54,14 +66,11 @@ def try_coupon(coupon_code):
         data = response.json()
         action_success = data.get("RESPONSE", {}).get("actionSuccess", None)
         error_message = data.get("RESPONSE", {}).get("errorMessage", "")
-        
-        log_entry = f"[{datetime.now()}] CODE: {coupon_code} | SUCCESS: {action_success} | ERROR: {error_message}"
-        
-        with open(LOG_FILE, "a", encoding="utf-8") as f:
-            f.write(log_entry + "\n")
 
-        # Only send message when max redemption limit is reached
-        if "You have reached maximum redemption limit" not in error_message:
+        log_message(f"CODE: {coupon_code} | SUCCESS: {action_success} | ERROR: {error_message}")
+
+        # Notify only when max redemption limit reached
+        if "You have reached maximum redemption limit" in error_message:
             telegram_text = (
                 f"🟩 <b>Coupon Tried:</b> {coupon_code}\n"
                 f"✅ <b>Success:</b> {action_success}\n"
@@ -69,19 +78,21 @@ def try_coupon(coupon_code):
             )
             send_telegram_message(telegram_text)
 
-        
-        print(log_entry)
-
     except Exception as e:
-        print("Request Error:", e)
+        log_message(f"Request Error: {e}")
 
 def coupon_worker():
+    log_message("⚙️ Worker started")
     while RUNNING:
-        code = generate_random_code()
-        try_coupon(code)
-        delay = random.randint(1,3)
-        print(f"Waiting {delay} seconds...")
-        time.sleep(delay)
+        try:
+            code = generate_random_code()
+            try_coupon(code)
+            delay = random.randint(1, 3)
+            log_message(f"⏳ Waiting {delay} seconds...")
+            time.sleep(delay)
+        except Exception as e:
+            log_message(f"❌ Worker crashed: {e}")
+            time.sleep(5)
 
 @app.route("/")
 def home():
@@ -89,21 +100,14 @@ def home():
 
 @app.route("/logs")
 def get_logs():
-    if not os.path.exists(LOG_FILE):
-        return jsonify({"logs": []})
-    with open(LOG_FILE, "r", encoding="utf-8") as f:
-        logs = f.readlines()
-    return jsonify({"logs": logs[-50:]})
+    return jsonify({"logs": LOGS[-50:]})
 
 @app.route("/status")
 def status():
     return jsonify({"running": RUNNING})
 
 if __name__ == "__main__":
-    # Send startup message once when server starts
     send_telegram_message("✅ <b>Coupon Bot Started</b>\nServer is now running and trying coupons...")
-
-    # Background thread for coupon worker
     t = threading.Thread(target=coupon_worker, daemon=True)
     t.start()
-    app.run(host="0.0.0.0", port=8000)
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
