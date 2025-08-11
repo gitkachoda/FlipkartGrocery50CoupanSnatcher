@@ -78,9 +78,8 @@ def coupon_worker():
     while RUNNING:
         code = generate_random_code()
         try_coupon(code)
-        # delay = random.randint(1,3)
-        # print(f"Waiting {delay} seconds...")
-        # time.sleep(delay)
+        # Optional delay
+        # time.sleep(random.randint(1, 3))
 
 @app.route("/")
 def home():
@@ -98,11 +97,9 @@ def get_logs():
 def status():
     return jsonify({"running": RUNNING})
 
-if __name__ == "__main__":
-    # Send startup message once when server starts
+# Run background thread when server starts
+@app.before_first_request
+def start_worker():
     send_telegram_message("✅ <b>Coupon Bot Started</b>\nServer is now running and trying coupons...")
-
-    # Background thread for coupon worker
     t = threading.Thread(target=coupon_worker, daemon=True)
     t.start()
-    app.run(host="0.0.0.0", port=5000)
