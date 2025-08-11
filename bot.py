@@ -61,7 +61,7 @@ def try_coupon(coupon_code):
             f.write(log_entry + "\n")
 
         # Only send message when max redemption limit is reached
-        if "You have reached maximum redemption limit" in error_message:
+        if "You have reached maximum redemption limit" not in error_message:
             telegram_text = (
                 f"🟩 <b>Coupon Tried:</b> {coupon_code}\n"
                 f"✅ <b>Success:</b> {action_success}\n"
@@ -69,6 +69,7 @@ def try_coupon(coupon_code):
             )
             send_telegram_message(telegram_text)
 
+        
         print(log_entry)
 
     except Exception as e:
