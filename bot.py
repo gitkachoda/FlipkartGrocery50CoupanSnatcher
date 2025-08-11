@@ -60,7 +60,6 @@ def try_coupon(coupon_code):
         with open(LOG_FILE, "a", encoding="utf-8") as f:
             f.write(log_entry + "\n")
 
-        # Only send message when max redemption limit is reached
         if "You have reached maximum redemption limit" in error_message:
             telegram_text = (
                 f"🟩 <b>Coupon Tried:</b> {coupon_code}\n"
@@ -78,8 +77,7 @@ def coupon_worker():
     while RUNNING:
         code = generate_random_code()
         try_coupon(code)
-        # Optional delay
-        # time.sleep(random.randint(1, 3))
+        # time.sleep(random.randint(1, 3))  # optional delay
 
 @app.route("/")
 def home():
@@ -97,9 +95,14 @@ def get_logs():
 def status():
     return jsonify({"running": RUNNING})
 
-# Run background thread when server starts
-@app.before_first_request
+# Start worker thread at import time (works for both local and Gunicorn/Render)
 def start_worker():
     send_telegram_message("✅ <b>Coupon Bot Started</b>\nServer is now running and trying coupons...")
     t = threading.Thread(target=coupon_worker, daemon=True)
     t.start()
+
+start_worker()  # runs immediately when app starts
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
