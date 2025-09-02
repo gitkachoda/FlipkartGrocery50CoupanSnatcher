@@ -4,8 +4,9 @@ import random
 import string
 import threading
 import requests
+import logging
+import sys
 from dotenv import load_dotenv
-from datetime import datetime
 from flask import Flask, jsonify
 
 # ================= Load .env =================
@@ -20,12 +21,21 @@ RUNNING = True
 app = Flask(__name__)
 
 # ================= Logger =================
-def log_to_console(msg):
-    timestamped = f"[{datetime.now()}] {msg}"
-    print(timestamped, flush=True)  # flush added
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)]  # ✅ force stdout for Render
+)
+logger = logging.getLogger(__name__)
+
+def log_to_console(msg: str):
+    logger.info(msg)
 
 # ================= Telegram Sender =================
 def send_telegram_message(text):
+    if not BOT_TOKEN or not CHAT_ID:
+        log_to_console("⚠️ BOT_TOKEN or CHAT_ID missing in environment variables")
+        return
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     payload = {"chat_id": CHAT_ID, "text": text, "parse_mode": "HTML"}
     try:
