@@ -22,7 +22,7 @@ app = Flask(__name__)
 # ================= Logger =================
 def log_to_console(msg):
     timestamped = f"[{datetime.now()}] {msg}"
-    print(timestamped, flush=True)
+    print(timestamped, flush=True)  # flush added
 
 # ================= Telegram Sender =================
 def send_telegram_message(text):
@@ -58,7 +58,13 @@ def try_coupon(coupon_code):
     }
     try:
         response = requests.post(url, headers=headers, json=payload, timeout=20)
-        data = response.json()
+
+        # ================= Safe JSON Handling =================
+        if response.headers.get("content-type", "").startswith("application/json"):
+            data = response.json()
+        else:
+            log_to_console(f"❌ Non-JSON Response (status {response.status_code}): {response.text[:200]}")
+            return
 
         action_success = data.get("RESPONSE", {}).get("actionSuccess", None)
         error_message = data.get("RESPONSE", {}).get("errorMessage", "")
